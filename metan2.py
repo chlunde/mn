@@ -132,10 +132,13 @@ class MetaN(object):
         self.matches = self.matcher.match(self.cmd)
         self.dirty = False
 
+        self.scr.move(0, 0)
+        self.scr.clrtobot()
+
         prompt = ">> "
         self.scr.addstr(0, 0, prompt, self.PROMPT)
         self.scr.addstr(self.cmd, self.PROMPT_INPUT)
-        self.scr.clrtoeol()  # after backspace
+        #self.scr.clrtoeol()  # after backspace
 
         y = 1
 
@@ -189,22 +192,29 @@ class MetaN(object):
 
                 offset += slen
 
-            self.scr.clrtoeol()
+            #self.scr.clrtoeol()
 
         y += dy
 
-        self.scr.clrtobot()
+        #self.scr.clrtobot()
         if len(unseen_selections):
-            self.scr.addstr(y, 0, "..also selected: ")
-            y += 1
+            #y += 1
+            x = 5
 
             for dy, choice in enumerate(unseen_selections):
-                if y + dy >= h:
+                self.scr.addstr(y + dy + 1, 0, " ~~   " + choice[0:w - x - 2], self.SELECTED)
+                if y + dy + 2 >= h:
                     break
-                self.scr.addstr(y + dy, 0, " ~~   " + choice, self.SELECTED)
+                #self.scr.clrtoeol()
 
+            if dy == len(unseen_selections) - 1:
+                self.scr.addstr(y, 0, "..also selected")
+            else:
+                self.scr.addstr(y, 0, "..also selected these and %d others" % (len(unseen_selections) - dy - 1))
+            #self.scr.clrtoeol()
 
-        self.scr.clrtobot()
+        #self.scr.clrtobot()
+        # TODO: May fail if input is too long
         self.scr.move(0, len(prompt) + self.cmd_cursor)
         self.scr.refresh()
 
