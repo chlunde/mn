@@ -4,7 +4,6 @@ import curses.ascii
 import termcolors
 import os
 
-
 # TODO: This Matcher code has bugs...
 
 class Matcher(object):
@@ -107,7 +106,10 @@ class MetaN(object):
         self.cmd_history = []
 
         self.choices = []
+        self.matches = []
         stdscr.timeout(500)
+
+        self.statusbar = ""
 
         self.PROMPT = termcolors.get_pair("#AE81FF")
         self.PROMPT_INPUT = termcolors.get_pair("#FFFFFF") | curses.A_BOLD
@@ -116,6 +118,7 @@ class MetaN(object):
         self.CHOICE = termcolors.get_pair("#F92672")
         self.SELECTION = termcolors.get_pair("#F92672", "#49483E") | curses.A_UNDERLINE
         self.SELECTED = termcolors.get_pair("#F92672", "#49483E")
+        self.STATUSBAR = termcolors.get_pair("#F92672", "#49483E")
 
         self.selection = 0
         self.selected = []
@@ -146,8 +149,8 @@ class MetaN(object):
 
         def tail_length():
             if len(unseen_selections):
-                return min(1 + len(unseen_selections), 5)
-            return 0
+                return min(2 + len(unseen_selections), 5)
+            return 1
 
         dy = 0  # for len(self.matches) == 0, so we can use dy outside the loop
         for dy, (score, choice, _, desc) in enumerate(self.matches):
@@ -203,8 +206,8 @@ class MetaN(object):
             x = 5
 
             for dy, choice in enumerate(unseen_selections):
-                self.scr.addstr(y + dy + 1, 0, " ~~   " + choice[0:w - x - 2], self.SELECTED)
-                if y + dy + 2 >= h:
+                self.scr.addstr(y + dy + 1, 0, " ~~   " + choice[0:w - x - 2], self.CHOICE)
+                if y + dy + 3 >= h:
                     break
                 #self.scr.clrtoeol()
 
@@ -214,16 +217,21 @@ class MetaN(object):
                 self.scr.addstr(y, 0, "..also selected these and %d others" % (len(unseen_selections) - dy - 1))
             #self.scr.clrtoeol()
 
-        #self.scr.clrtobot()
+        self.scr.addstr(h - 1, 0, self.statusbar, self.STATUSBAR)
         # TODO: May fail if input is too long
         self.scr.move(0, len(prompt) + self.cmd_cursor)
         self.scr.refresh()
 
     def set_choices(self, l):
-        # TODO: Allow adding extra choices real time
+        self.all = l
         self.matcher = Matcher(l)
         self.matcher.match(self.cmd)
         self.dirty = True
+
+    def add_choices(self, l):
+        # TODO: Reuse matcher object and keep state
+        # TODO: Keep cursor stable?
+        self.set_choices(self.all + l)
 
     def load_cmd_history(self):
         f = open(os.path.expanduser("~/.launcher_history"), "r")
@@ -347,17 +355,117 @@ class MetaN(object):
         self.paint()
 
 
-def main(stdscr):
-    import os
+def main(stdscr, options, args):
+    import select
+    import fcntl
+
+    # make stdin a non-blocking file
+    fd = sys.stdin.fileno()
+    fl = fcntl.fcntl(fd, fcntl.F_GETFL)
+    fcntl.fcntl(fd, fcntl.F_SETFL, fl | os.O_NONBLOCK)
+
+    choices = sys.stdin.read().splitlines()
+
     mn = MetaN(stdscr)
 
-    mn.set_choices([s.strip() for s in os.popen("find ~ | head -n 10000", "r").readlines()])
-    #mn.set_choices(os.listdir("."))
+    mn.set_choices(choices)
+    eof = False
+
     while not mn.done:
         mn.handle_key()
-    return " ".join(mn.selected)
+
+        if not eof:
+            rlist, wlist, xlist = select.select([sys.stdin], [], [], 1/33.0)
+
+            if len(rlist):
+                new_choices = []
+                while True:
+                    try:
+                        data = sys.stdin.readline()
+                    except IOError, e:
+                        break
+
+                    if data == "":
+                        eof = True
+                        break
+
+                    new_choices.append(data.strip())
+
+                mn.statusbar = "Adding %d choices" % len(new_choices)
+                mn.add_choices(new_choices)
+                mn.dirty = True
+                mn.paint()
+
+    return mn.selected
 
 if __name__ == "__main__":
-    print curses.wrapper(main)
+    from optparse import OptionParser
+    import os
+    import sys
+
+    usage = """usage: %prog [options] [exec exec-args {} exec-args]
+
+    Options are read from standard input by default, so for example
+    
+        ls -1 *.c | %prog -- ls -l
+
+    will execute ls -l on the selected files.
+
+    It is recommened to alias %prog to something shorter such av `mn'.
+
+EXAMPLES:
+
+    List all log files, pick some of them in %prog, and compress them as root with gzip:
+
+    ls -1 *.log | %prog --print0 | xargs -0 sudo gzip -v
+
+    """
+
+    parser = OptionParser(usage=usage)
+    parser.add_option("--print0", action="store_const", const="0", dest="output", default=None,
+                      help="Print results on standard output.  Each option is followed by a ASCII NUL")
+    parser.add_option("--print", action="store_const", const="n", dest="output",
+                      help="Print results on standard output.  Each option is followed by a ASCII newline")
+    parser.add_option("-q", "--quiet",
+                      action="store_false", dest="verbose", default=True,
+                      help="don't print status messages to stdout")
+
+    (options, args) = parser.parse_args()
+
+    # stdin and stdout may be pipes, clone them and
+    # make pythons sys.stdin/stdout point to the pipes
+    stdin_fileno = os.dup(0)
+    stdout_fileno = os.dup(1)
+
+    sys.stdin = os.fdopen(stdin_fileno, "r")
+    sys.stdout = os.fdopen(stdout_fileno, "w")
+
+    # For curses to work properly make sure fd 0/1 points
+    # to the TTY
+    f = open("/dev/tty", "r")
+    os.dup2(f.fileno(), 0)
+    f = open("/dev/tty", "w")
+    os.dup2(f.fileno(), 1)
+
+    selected = curses.wrapper(lambda x: main(x, options, args))
+
+    if options.output == 'n':
+        for a in selected:
+            sys.stdout.write(a)
+            sys.stdout.write('\n')
+    elif options.output == '0':
+        for a in selected:
+            sys.stdout.write(a)
+            sys.stdout.write('\0')
+    else:
+        params = args
+
+        try:
+            insert = params.index('{}')
+            params = params[0:insert] + selected + params[insert + 1:]
+        except ValueError:  # No {}
+            params = params + selected
+
+        os.execvp(args[0], params)
 
 # vim: sw=4 sts=4 et
