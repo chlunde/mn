@@ -146,9 +146,10 @@ class MetaN(object):
 
         def tail_length():
             if len(unseen_selections):
-                return 1 + len(unseen_selections)
+                return min(1 + len(unseen_selections), 5)
             return 0
 
+        dy = 0  # for len(self.matches) == 0, so we can use dy outside the loop
         for dy, (score, choice, _, desc) in enumerate(self.matches):
             if (y + dy + tail_length()) >= h:
                 break
