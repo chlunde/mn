@@ -96,8 +96,8 @@ class MetaN(object):
     def __init__(self, stdscr):
         self.scr = stdscr
         curses.start_color()
-        curses.halfdelay(1)
-        self.scr.keypad(1)
+        self.scr.keypad(True)
+        self.scr.nodelay(True)
         curses.raw()
         self.cmd = ""
         self.cmd_cursor = 0
@@ -107,7 +107,6 @@ class MetaN(object):
 
         self.choices = []
         self.matches = []
-        stdscr.timeout(500)
 
         self.statusbar = ""
 
@@ -374,27 +373,26 @@ def main(stdscr, options, args):
     while not mn.done:
         mn.handle_key()
 
-        if not eof:
-            rlist, wlist, xlist = select.select([sys.stdin], [], [], 1/33.0)
+        rlist, wlist, xlist = select.select([sys.stdin, 0], [], [], 1/33.0)
 
-            if len(rlist):
-                new_choices = []
-                while True:
-                    try:
-                        data = sys.stdin.readline()
-                    except IOError, e:
-                        break
+        if sys.stdin in rlist:
+            new_choices = []
+            while True:
+                try:
+                    data = sys.stdin.readline()
+                except IOError, e:
+                    break
 
-                    if data == "":
-                        eof = True
-                        break
+                if data == "":
+                    eof = True
+                    break
 
-                    new_choices.append(data.strip())
+                new_choices.append(data.strip())
 
-                mn.statusbar = "Adding %d choices" % len(new_choices)
-                mn.add_choices(new_choices)
-                mn.dirty = True
-                mn.paint()
+            mn.statusbar = "Adding %d choices" % len(new_choices)
+            mn.add_choices(new_choices)
+            mn.dirty = True
+            mn.paint()
 
     return mn.selected
 
