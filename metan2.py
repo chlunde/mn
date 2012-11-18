@@ -73,12 +73,12 @@ class Matcher(object):
                 desc.append((True, mlen))
 
             score = sum([mlen for skipped, mlen in desc if not skipped])
-            score -= sum([max(mlen*0.2, 0.5) for skipped, mlen in desc[1:] if skipped])
+            score -= sum([min(mlen * .2, .5) for skipped, mlen in desc[1:] if skipped])
             leftover = len(choice) - sum([mlen for _, mlen in desc])
             if leftover:
                 desc.append((True, leftover))
             else:
-                # Bonus score if we can anchor the search to the end of the string
+                # Bonus score if we can anchor the search to the end
                 score += 0.1
 
             # Severe penalty for leftovers in search string
