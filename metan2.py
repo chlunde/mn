@@ -259,8 +259,14 @@ class MetaN(object):
                 self.cmd = self.cmd[0:self.cmd_cursor - 1] + self.cmd[self.cmd_cursor:]
                 self.cmd_cursor -= 1
 
+        elif c == C('a'):
+            self.cmd_cursor = 0
+
         elif c == C('c'):
             raise KeyboardInterrupt
+
+        elif c == C('e'):
+            self.cmd_cursor = len(self.cmd)
 
         elif c == C('k'):
             self.cmd = self.cmd[:self.cmd_cursor]
