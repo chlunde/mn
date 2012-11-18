@@ -39,12 +39,7 @@ class Matcher(object):
             # and calculate the previous ci, si
             while len(desc) and desc[-1][0]:
                 desc = desc[:-1]
-                #desc.pop()
 
-            if len(desc):
-                # Ugly.. Fixes desc so we don't get one and one characted
-                # Also forces a clone
-                desc = desc[:-1]
             desc = desc[:]
 
             ci = sum([mlen for _, mlen in desc])
@@ -59,7 +54,10 @@ class Matcher(object):
                     mlen += 1
 
                 if mlen:
-                    desc.append((False, mlen))
+                    if len(desc) and desc[-1][0] is False:
+                        desc[-1] = (False, desc[-1][1] + mlen)
+                    else:
+                        desc.append((False, mlen))
 
                 if si >= ls or ci >= lc:
                     break
