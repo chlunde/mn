@@ -19,21 +19,17 @@ Work in progress!
 
 Bind Meta-N i tmux:
 
-    bind-key -n M-n split-window -l 10 "tmux select-window -t $(tmux list-windows | metan.py --print | cut -d: -f1)"
-
-Set up a shorter alias for your shell:
-
-    echo "alias mn='/path/to/metan.py'" >> ~/.bashrc
+    bind-key -n M-n split-window -l 10 "tmux select-window -t $(tmux list-windows | mn --print | cut -d: -f1)"
 
 ## Normal use-cases ##
 
 Select window in `tmux`:
 
-    bind-key -n M-n split-window -l 10 "tmux select-window -t $(tmux list-windows | metan.py --print | cut -d: -f1)"
+    bind-key -n M-n split-window -l 10 "tmux select-window -t $(tmux list-windows | mn --print | cut -d: -f1)"
 
 Pick a host to connect to, from `known_hosts`:
 
-    awk '-F[, ]' '{ print $1 }' < ~/.ssh/known_hosts | ./metan2.py ssh
+    awk '-F[, ]' '{ print $1 }' < ~/.ssh/known_hosts | mn ssh
 
 ## Key bindings ##
 
@@ -58,12 +54,12 @@ Enter: Return data under cursor if no selections, otherwise return all choices c
 
 Pick a python-file in the current directory to run `ls -l` on:
 
-    ls -1 *.py | metan.py -- ls -l
+    ls -1 *.py | mn -- ls -l
 
 You can also use command substitution `$()` with `--print`.  Do not use this mode if you want to be able to abort with Ctrl-c!
 
-    ls -l $(ls -1 *.py | metan.py --print)
+    ls -l $(ls -1 *.py | mn --print)
 
 ...or `xargs -0`:
 
-    find / -size +10M | metan.py --print0 | xargs -0 sudo gzip -v
+    find / -size +10M | mn --print0 | xargs -0 sudo gzip -v
