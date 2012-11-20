@@ -3,10 +3,67 @@ import curses
 import curses.ascii
 import termcolors
 import os
+import re
+import sre_constants
+
+
+class MNException(Exception):
+    """A user error which is displayed in the status bar, while the program keeps running"""
+    def __init__(self, message):
+        self.message = message
+
+    def __str__(self):
+        return str(self.message)
+
+
+def compress_desc(desc, skipped):
+    # [a,a,a,b,b,a,a,a] -> (a,3), (b,2), (a,3)
+    if len(desc) and desc[-1][0] == skipped:
+	desc[-1] = (skipped, desc[-1][1] + 1)
+    else:
+	desc.append((skipped, 1))
+
+    return desc
+
+
+class MatcherA(object):
+    def __init__(self, choices):
+        self.choices = [(0, choice, choice.lower(), [(True, len(choice))])
+                        for choice in choices]
+
+    def d(self, a, b):
+        score, pos = 0.0, 0
+        ms = []
+        for y in a:
+            match = False
+            for i,x in enumerate(b[pos:]):
+                if y.upper() == x.upper():
+                    match = True
+                    pos += i + 1
+                    score += 1.0 / (i + 1)
+                    ms.append(pos - 1)
+                    break
+            if not match: return ms, 0
+        return ms, score
+
+    def match(self, s):
+        if s == "":
+            return self.choices
+
+        s = s.lower()
+        l = []
+        for _, choice_org, choice, _ in self.choices:
+            hits, score = self.d(s, choice)
+            if score > 0:
+                desc = reduce(compress_desc, [(not i in hits) for i in range(len(choice))], [])
+                l.append((score, choice_org, choice, desc))
+
+        return list(reversed(sorted(l)))
+
 
 # TODO: This Matcher code has bugs...
 
-class Matcher(object):
+class MatcherB(object):
     def __init__(self, choices):
         self.choices = [(0, choice, choice.lower(), [(True, len(choice))])
                         for choice in choices]
@@ -92,6 +149,36 @@ class Matcher(object):
         return self.last_matches
 
 
+class RegexMatcher(object):
+    def __init__(self, choices):
+        self.choices = [(0, choice, choice.lower(), [(True, len(choice))])
+                        for choice in choices]
+
+    def match(self, s):
+        s = s.lower()
+        if s == "":
+            return self.choices
+
+        try:
+            r = re.compile(s)
+        except sre_constants.error, e:
+            raise MNException("Problems compiling re: " + str(e))
+
+        l = []
+
+        for _, choice_org, choice, _ in self.choices:
+            m = r.search(choice)
+            if m:
+                score = m.end() - m.start()
+                matched_characters = [True] * len(choice)
+                for group in range(m.lastindex and 1 or 0, (m.lastindex or 0) + 1):
+                    matched_characters[m.start(group) : m.end(group)] = [False] * (m.end(group) - m.start(group))
+                desc = reduce(compress_desc, matched_characters, [])
+                l.append((score, choice_org, choice, desc))
+
+        return list(reversed(sorted(l)))
+
+
 class MetaN(object):
     def __init__(self, stdscr):
         self.scr = stdscr
@@ -108,7 +195,10 @@ class MetaN(object):
         self.choices = []
         self.matches = []
 
-        self.statusbar = ""
+        self.matchers = [ MatcherA, MatcherB, RegexMatcher ]
+        self.cur_matcher = 0
+
+        self.statusbar = {}
 
         self.PROMPT = termcolors.get_pair("#AE81FF")
         self.PROMPT_INPUT = termcolors.get_pair("#FFFFFF") | curses.A_BOLD
@@ -131,7 +221,12 @@ class MetaN(object):
         if not self.dirty:
             return
 
-        self.matches = self.matcher.match(self.cmd)
+        try:
+            self.matches = self.matcher.match(self.cmd)
+        except MNException, e:
+            self.statusbar['error'] = e.message
+
+
         self.dirty = False
 
         self.scr.move(0, 0)
@@ -216,15 +311,20 @@ class MetaN(object):
                 self.scr.addstr(y, 0, "..also selected these and %d others" % (len(unseen_selections) - dy - 1))
             #self.scr.clrtoeol()
 
-        self.scr.addstr(h - 1, 0, self.statusbar, self.STATUSBAR)
+        self.scr.addstr(h - 1, 0, repr(self.statusbar), self.STATUSBAR)
         # TODO: May fail if input is too long
         self.scr.move(0, len(prompt) + self.cmd_cursor)
         self.scr.refresh()
 
     def set_choices(self, l):
         self.all = l
-        self.matcher = Matcher(l)
-        self.matcher.match(self.cmd)
+        self.matcher = self.matchers[self.cur_matcher](l)
+
+        try:
+            self.matcher.match(self.cmd)
+        except MNException, e:
+            self.statusbar['error'] = e.message
+
         self.dirty = True
 
     def add_choices(self, l):
@@ -249,6 +349,8 @@ class MetaN(object):
 
         if c != -1:
             self.dirty = True
+            if "error" in self.statusbar:
+                del self.statusbar["error"]
 
         # C('u') character code for Ctrl-u
         def C(a):
@@ -279,9 +381,6 @@ class MetaN(object):
             self.cmd = self.cmd[:self.cmd_cursor]
 
         elif c == C('l'):
-            self.dirty = True
-            # TODO: Check for input on stdin?
-
             # TODO: Hack to test history without leaving
             self.save_cmd_history()
 
@@ -312,6 +411,15 @@ class MetaN(object):
             self.cmd = self.cmd[:-len(self.word_at_selection)]
             self.cmd_cursor = len(self.cmd)
             #self.cmd += "was: " + self.word_at_selection
+
+        elif c == C('x'):
+            self.cur_matcher = (self.cur_matcher + 1) % len(self.matchers)
+            try:
+                self.set_choices(self.all)
+            except MNException, e:
+                self.statusbar['error'] = e.message
+
+            self.statusbar['matcher'] = self.matcher.__class__.__name__
 
         elif c == C('z'):
             choice = self.matches[self.selection][1]
@@ -363,7 +471,10 @@ def main(stdscr, options, args):
     fl = fcntl.fcntl(fd, fcntl.F_GETFL)
     fcntl.fcntl(fd, fcntl.F_SETFL, fl | os.O_NONBLOCK)
 
-    choices = sys.stdin.read().splitlines()
+    try:
+        choices = sys.stdin.read().splitlines()
+    except IOError:
+        choices = []
 
     mn = MetaN(stdscr)
 
@@ -389,7 +500,7 @@ def main(stdscr, options, args):
 
                 new_choices.append(data.strip())
 
-            mn.statusbar = "Adding %d choices" % len(new_choices)
+            mn.statusbar['added'] = "Adding %d choices" % len(new_choices)
             mn.add_choices(new_choices)
             mn.dirty = True
             mn.paint()

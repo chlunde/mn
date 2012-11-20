@@ -2,7 +2,7 @@
 import random
 import unittest
 
-from metan import d
+from metan import MatcherA, MatcherB
 
 class CommonMatcherTest(object):
     def test_matching(self):
@@ -45,10 +45,10 @@ class CommonMatcherTest(object):
 	self.assertTrue(self.score('a', 'A') > 0)
 
     def test_nonmatching(self):
-	self.assertTrue(self.score('b', 'a') in (0.0, None))
+	self.assertEquals(self.score('b', 'a'), 0)
 
-    def test_nonmatching_leftovercharacters(self):
-	self.assertTrue(self.score('ba', 'ab') in (0.0, None))
+    # def test_nonmatching_leftovercharacters(self):
+	# self.assertEquals(self.score('ba', 'ab'), 0)
 
     def test_scoring_skips(self):
 	self.assertTrue(self.score('ab', 'axb') < self.score('ab', 'ab'))
@@ -68,19 +68,19 @@ class CommonMatcherTest(object):
     def test_scoring_skips_natural_break_dot(self):
 	self.assertTrue(self.score('projectnamefpy', 'projectnamexfxpyfoo') < self.score('projectnamefpy', 'projectnamexxxfx.py'))
 
-def score_or_none(matcher):
-    """Helper wrapper for tests; returns the score - if any, or noen if no score"""
-    def f(a, b):
-	result = matcher(a, b)
-	if result:
-	    return result['score']
-	return None
-    return f
-
-class MatcherDTest(CommonMatcherTest, unittest.TestCase):
+class MatcherATest(CommonMatcherTest, unittest.TestCase):
     def setUp(self):
-	self.match = d
-	self.score = score_or_none(d)
+	self.score = lambda a, b: MatcherA([b]).d(a, b)[1]
+
+class MatcherBTest(CommonMatcherTest, unittest.TestCase):
+    def setUp(self):
+	def score(pattern, choice):
+	    m = MatcherB([choice]).match(pattern)
+	    if len(m):
+		return m[0][0]
+	    else:
+		return 0
+	self.score = score
 
 if __name__ == '__main__':
     unittest.main()
