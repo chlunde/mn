@@ -128,13 +128,24 @@ class MatcherB(object):
 
                 desc.append((True, mlen))
 
-            score = sum([mlen for skipped, mlen in desc if not skipped])
-            score -= sum([min(mlen * .2, .5) for skipped, mlen in desc[1:] if skipped])
+            score = 0
+            ci = 0
+            for skipped, mlen in desc:
+                ci += mlen
+                if skipped:
+                    if choice[ci - 1] not in ('.', '/'):
+                        score -= min(mlen * .2, .5)
+                else:
+                    score += mlen
             leftover = len(choice) - sum([mlen for _, mlen in desc])
             if leftover:
                 desc.append((True, leftover))
             else:
                 # Bonus score if we can anchor the search to the end
+                score += 0.1
+
+            if not desc[0][0]:
+                # Bonus score if we can anchor the search to the start
                 score += 0.1
 
             # Severe penalty for leftovers in search string

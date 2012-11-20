@@ -66,7 +66,7 @@ class CommonMatcherTest(object):
 	self.assertTrue(self.score('pathfile', 'pathFOOfile') < self.score('pathfile', 'path/x/file'))
 
     def test_scoring_skips_natural_break_dot(self):
-	self.assertTrue(self.score('projectnamefpy', 'projectnamexfxpyfoo') < self.score('projectnamefpy', 'projectnamexxxfx.py'))
+	self.assertTrue(self.score('fpy', 'foopy') < self.score('fpy', 'fo.py'))
 
 class MatcherATest(CommonMatcherTest, unittest.TestCase):
     def setUp(self):
