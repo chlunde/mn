@@ -328,7 +328,27 @@ class MetaN(object):
         self.scr.refresh()
 
     def set_choices(self, l):
+        if len(self.cmd_history) == 0:
+            self.load_cmd_history()
         self.all = l
+        def in_history_cmp(a, b):
+            try:
+                idx_a = self.cmd_history.index(a)
+            except:
+                idx_a = -1
+
+            try:
+                idx_b = self.cmd_history.index(b)
+            except:
+                idx_b = -1
+
+            #h = cmp(idx_b, idx_a)
+            h = cmp(self.cmd_history.count(b), self.cmd_history.count(a))
+            if h == 0:
+                return cmp(a, b)
+            else:
+                return h
+        self.all.sort(in_history_cmp)
         self.matcher = self.matchers[self.cur_matcher](l)
 
         try:
