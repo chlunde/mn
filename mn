@@ -455,6 +455,17 @@ class MetaN(object):
             if self.cmd_cursor < len(self.cmd):
                 self.cmd_cursor += 1
 
+        elif c == 9:
+            self.cmd = self.matches[self.selection][1]
+            self.cmd_cursor = len(self.cmd)
+
+        elif c == C("q"):
+            choice = self.cmd
+            if not choice in self.selected:
+                self.selected.insert(0, choice)
+            self.done = True
+            self.save_cmd_history()
+
         elif c == 10:
             choice = self.matches[self.selection][1]
             if not choice in self.selected:
