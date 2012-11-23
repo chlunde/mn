@@ -467,12 +467,14 @@ class MetaN(object):
             self.save_cmd_history()
 
         elif c == 10:
-            choice = self.matches[self.selection][1]
+            if self.matches:
+                choice = self.matches[self.selection][1]
+            else:
+                choice = self.cmd
             if not choice in self.selected:
                 self.selected.append(choice)
             self.done = True
             self.save_cmd_history()
-
         else:
             # TODO: Remove
             try:
