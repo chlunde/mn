@@ -40,6 +40,8 @@ Left/right: Move cursor in the pattern
 
 Ctrl-r, s: Load previous/next pattern from history
 
+Tab: Replace the pattern with the choice under the cursor
+
 ### Choosing ###
 
 Up/Down: Move cursor between choices
@@ -48,7 +50,9 @@ Ctrl-z: Select
 
 Ctrl-x: Change to the next pattern mode
 
-Enter: Return data under cursor if no selections, otherwise return all choices chosen with Ctrl-z.
+Enter: Return data under cursor if no selections, return pattern if pattern has no matches, otherwise return all choices chosen with Ctrl-z.
+
+Ctrl-q: Return pattern
 
 ## Crazy examples ##
 
