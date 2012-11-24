@@ -582,7 +582,7 @@ EXAMPLES:
 
     selected = curses.wrapper(lambda x: main(x, options, args))
 
-    if options.output == 'n':
+    if options.output == 'n' or not args:
         for a in selected:
             sys.stdout.write(a)
             sys.stdout.write('\n')
