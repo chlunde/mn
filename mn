@@ -599,6 +599,10 @@ EXAMPLES:
         except ValueError:  # No {}
             params = params + selected
 
-        os.execvp(args[0], params)
+        if args: 
+            os.execvp(args[0], params)
+        elif params: 
+            print(" ".join(params))
+        
 
 # vim: sw=4 sts=4 et
